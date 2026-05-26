@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./dommoda.db"
 
     # CORS — kept as str to avoid pydantic_settings auto JSON decode on list[str]
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    cors_origins: str = "https://dommoda.vercel.app,https://backanddommoda.onrender.com,http://localhost:3000,http://127.0.0.1:3000"
 
     def get_cors_origins(self) -> list[str]:
         v = self.cors_origins.strip()
