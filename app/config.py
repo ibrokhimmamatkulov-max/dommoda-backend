@@ -1,5 +1,4 @@
 import json
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,24 +12,18 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///./dommoda.db"
 
-    # CORS
-    cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # CORS — kept as str to avoid pydantic_settings auto JSON decode on list[str]
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: object) -> list[str]:
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            v = v.strip()
-            try:
-                parsed = json.loads(v)
-                if isinstance(parsed, list):
-                    return parsed
-            except json.JSONDecodeError:
-                pass
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    def get_cors_origins(self) -> list[str]:
+        v = self.cors_origins.strip()
+        try:
+            parsed = json.loads(v)
+            if isinstance(parsed, list):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+        return [o.strip() for o in v.split(",") if o.strip()]
 
     # App
     app_title: str = "Dommoda API"
