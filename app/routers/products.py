@@ -79,7 +79,7 @@ async def list_products(
     ``popular`` (review count desc), ``price_asc``, ``price_desc``, or ``new``
     (created_at desc).
     """
-    stmt = select(Product)
+    stmt = select(Product).where(Product.in_stock.is_(True))
 
     if category is not None:
         stmt = stmt.where(Product.category == category)

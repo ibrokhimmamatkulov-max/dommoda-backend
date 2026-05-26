@@ -82,7 +82,7 @@ def _product_to_dict(product: Product) -> dict:
         "price_original": product.price_original,
         "discount_percent": product.discount_percent,
         "images": product.images,
-        "sizes": product.sizes,
+        "sizes": [s["label"] for s in product.sizes],
         "colors": product.colors,
         "rating": product.rating,
         "review_count": product.review_count,

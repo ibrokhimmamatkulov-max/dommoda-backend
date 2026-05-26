@@ -29,6 +29,7 @@ from app.routers import (
     orders_router,
     products_router,
     promo_router,
+    settings_router,
 )
 
 
@@ -74,6 +75,7 @@ app.include_router(categories_router)
 app.include_router(cart_router)
 app.include_router(orders_router)
 app.include_router(promo_router)
+app.include_router(settings_router)
 
 
 # ---------------------------------------------------------------------------
