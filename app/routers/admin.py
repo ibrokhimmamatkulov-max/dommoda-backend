@@ -93,6 +93,26 @@ def _product_to_dict(product: Product) -> dict:
 
 
 @router.get(
+    "/products/{product_id}",
+    response_model=dict,
+    summary="Get a single product — admin only",
+)
+async def admin_get_product(
+    product_id: str,
+    _admin: Admin,
+    db: DB,
+) -> dict:
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product: Product | None = result.scalar_one_or_none()
+    if product is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product '{product_id}' not found",
+        )
+    return _product_to_dict(product)
+
+
+@router.get(
     "/products",
     response_model=AdminProductListOut,
     summary="List all products (including inactive) — admin only",
