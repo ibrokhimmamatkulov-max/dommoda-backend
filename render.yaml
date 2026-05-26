@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: dommoda-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python seed.py
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ADMIN_LOGIN
+        value: admin
+      - key: ADMIN_PASSWORD
+        value: dommoda2024
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./dommoda.db
+      - key: CORS_ORIGINS
+        value: '["https://dommoda.vercel.app","http://localhost:3000"]'
