@@ -9,8 +9,16 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # Database
+    # Database — normalize Render's postgres:// → postgresql+asyncpg://
     database_url: str = "sqlite+aiosqlite:///./dommoda.db"
+
+    def get_database_url(self) -> str:
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://") and "+asyncpg" not in url:
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
 
     # CORS — kept as str to avoid pydantic_settings auto JSON decode on list[str]
     cors_origins: str = "https://dommoda.vercel.app,https://backanddommoda.onrender.com,http://localhost:3000,http://127.0.0.1:3000"

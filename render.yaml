@@ -11,7 +11,5 @@ services:
         value: dommoda2024
       - key: JWT_SECRET
         generateValue: true
-      - key: DATABASE_URL
-        value: sqlite+aiosqlite:///./dommoda.db
       - key: CORS_ORIGINS
         value: https://dommoda.vercel.app,https://backanddommoda.onrender.com,http://localhost:3000
