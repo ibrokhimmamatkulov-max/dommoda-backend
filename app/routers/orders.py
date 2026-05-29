@@ -56,8 +56,11 @@ async def create_order(body: CreateOrderRequest, db: DB) -> OrderOut:
     order.items = [item.model_dump() for item in body.items]
 
     db.add(order)
-    await db.flush()  # assign DB defaults (created_at etc.) before returning
+    await db.flush()
     await db.refresh(order)
+
+    from app.telegram import send_order_notification
+    await send_order_notification(order)
 
     return OrderOut.from_orm_order(order)
 

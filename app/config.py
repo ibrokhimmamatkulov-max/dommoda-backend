@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
 
+    # Telegram notifications (optional)
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
     # Admin auth
     admin_login: str = "admin"
     admin_password: str = "changeme"

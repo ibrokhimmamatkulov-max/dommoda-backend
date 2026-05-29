@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.dependencies.auth import get_current_admin
+from app.models.order import Order, OrderStatus
 from app.models.product import Product
 from app.schemas.admin import (
     AdminLoginRequest,
@@ -283,3 +284,55 @@ async def admin_delete_product(
         )
     product.in_stock = False
     await db.flush()
+
+
+# ---------------------------------------------------------------------------
+# Orders
+# ---------------------------------------------------------------------------
+
+@router.get("/orders", response_model=list[dict], summary="List all orders — admin only")
+async def admin_list_orders(_admin: Admin, db: DB) -> list[dict]:
+    result = await db.execute(select(Order).order_by(Order.created_at.desc()))
+    orders = result.scalars().all()
+    return [
+        {
+            "id": o.id,
+            "status": o.status.value,
+            "recipient_name": o.recipient_name,
+            "phone": o.phone,
+            "email": o.email,
+            "city": o.city,
+            "delivery_method": o.delivery_method.value,
+            "total": o.total,
+            "items_count": len(o.items),
+            "items": o.items,
+            "promo_code": o.promo_code,
+            "promo_discount": o.promo_discount,
+            "subtotal": o.subtotal,
+            "street": o.street,
+            "building": o.building,
+            "apartment": o.apartment,
+            "comment": o.comment,
+            "created_at": o.created_at.isoformat(),
+        }
+        for o in orders
+    ]
+
+
+@router.patch("/orders/{order_id}/status", response_model=dict, summary="Update order status — admin only")
+async def admin_update_order_status(
+    order_id: str,
+    body: dict,
+    _admin: Admin,
+    db: DB,
+) -> dict:
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order: Order | None = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    try:
+        order.status = OrderStatus(body.get("status"))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
+    await db.flush()
+    return {"id": order.id, "status": order.status.value}
