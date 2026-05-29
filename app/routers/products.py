@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -67,24 +67,24 @@ async def get_product(product_id: str, db: DB) -> ProductOut:
 )
 async def list_products(
     db: DB,
-    category: str | None = Query(None, description="Filter by category slug (women/men/kids/sport)"),
-    subcategory: str | None = Query(None, description="Filter by subcategory slug"),
-    sort: SortParam = Query("popular", description="Sort order"),
-    page: int = Query(1, ge=1, description="Page number (1-based)"),
-    limit: int = Query(24, ge=1, le=100, description="Items per page"),
+    category: str | None = Query(None),
+    subcategory: str | None = Query(None),
+    search: str | None = Query(None, description="Search by name or brand"),
+    sort: SortParam = Query("popular"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(24, ge=1, le=100),
 ) -> ProductListOut:
-    """Return a paginated list of products.
-
-    Supports filtering by ``category`` and ``subcategory``, and sorting by
-    ``popular`` (review count desc), ``price_asc``, ``price_desc``, or ``new``
-    (created_at desc).
-    """
     stmt = select(Product).where(Product.in_stock.is_(True))
 
     if category is not None:
         stmt = stmt.where(Product.category == category)
     if subcategory is not None:
         stmt = stmt.where(Product.subcategory == subcategory)
+    if search is not None and search.strip():
+        pattern = f"%{search.strip()}%"
+        stmt = stmt.where(
+            or_(Product.name.ilike(pattern), Product.brand.ilike(pattern))
+        )
 
     match sort:
         case "price_asc":
