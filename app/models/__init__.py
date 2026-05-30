@@ -9,6 +9,7 @@ from app.models.order import Order, OrderStatus, DeliveryMethod
 from app.models.product import Product
 from app.models.promo import PromoCode
 from app.models.setting import SiteSetting
+from app.models.analytics import AnalyticsEvent
 
 __all__ = [
     "Category",

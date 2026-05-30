@@ -3,6 +3,19 @@ import httpx
 from app.config import settings
 
 
+async def send_telegram(text: str) -> None:
+    if not settings.telegram_bot_token or not settings.telegram_chat_id:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post(
+                f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
+                json={"chat_id": settings.telegram_chat_id, "text": text, "parse_mode": "Markdown"},
+            )
+    except Exception:
+        pass
+
+
 async def send_order_notification(order) -> None:
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
         return
@@ -28,15 +41,4 @@ async def send_order_notification(order) -> None:
         + f"💰 *Итого: {order.total:,} ₽*"
     )
 
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            await client.post(
-                f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
-                json={
-                    "chat_id": settings.telegram_chat_id,
-                    "text": text,
-                    "parse_mode": "Markdown",
-                },
-            )
-    except Exception:
-        pass  # не роняем приложение если Telegram недоступен
+    await send_telegram(text)

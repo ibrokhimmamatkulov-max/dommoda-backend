@@ -24,6 +24,7 @@ from app.models import (  # noqa: F401 — import side-effect: registers metadat
 from app.database import Base
 from app.routers import (
     admin_router,
+    analytics_router,
     cart_router,
     categories_router,
     orders_router,
@@ -76,6 +77,7 @@ app.include_router(cart_router)
 app.include_router(orders_router)
 app.include_router(promo_router)
 app.include_router(settings_router)
+app.include_router(analytics_router)
 
 
 # ---------------------------------------------------------------------------
