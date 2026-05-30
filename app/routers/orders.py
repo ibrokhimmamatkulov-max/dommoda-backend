@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.order import DeliveryMethod, Order, OrderStatus
 from app.schemas.order import CreateOrderRequest, OrderItemOut, OrderOut
+from app.telegram import send_telegram
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -88,3 +89,26 @@ async def get_order(order_id: str, db: DB) -> OrderOut:
             detail=f"Order '{order_id}' not found",
         )
     return OrderOut.from_orm_order(order)
+
+
+@router.post("/{order_id}/return", summary="Customer requests a return")
+async def request_return(order_id: str, db: DB) -> dict:
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order: Order | None = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    if order.status != OrderStatus.DELIVERED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Возврат возможен только для доставленных заказов",
+        )
+    order.status = OrderStatus.RETURN_REQUESTED
+    await db.flush()
+    await send_telegram(
+        f"↩️ *Запрос на возврат*\n\n"
+        f"📦 Заказ: {order.id}\n"
+        f"📞 Телефон: {order.phone}\n"
+        f"💰 Сумма: {order.total:,} ₽\n\n"
+        f"Зайди в админку и обработай возврат\."
+    )
+    return {"ok": True, "status": "return_requested"}

@@ -18,6 +18,8 @@ class OrderStatus(str, enum.Enum):
     SHIPPED = "shipped"
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
+    RETURN_REQUESTED = "return_requested"
+    RETURNED = "returned"
 
 
 class DeliveryMethod(str, enum.Enum):
