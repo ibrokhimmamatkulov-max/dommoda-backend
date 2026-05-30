@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 class CartItemIn(BaseModel):
@@ -43,13 +43,13 @@ class OrderItemIn(BaseModel):
 class CreateOrderRequest(BaseModel):
     delivery_method: str = Field(..., pattern="^(courier|pickup|post)$")
     city: str = Field(..., min_length=1, max_length=200)
-    street: str = Field(..., min_length=1, max_length=300)
-    building: str = Field(..., min_length=1, max_length=50)
+    street: str | None = Field(None, max_length=300)
+    building: str | None = Field(None, max_length=50)
     apartment: str | None = Field(None, max_length=50)
-    zip_code: str = Field(..., min_length=3, max_length=20)
+    zip_code: str | None = Field(None, max_length=20)
     recipient_name: str = Field(..., min_length=2, max_length=200)
     phone: str = Field(..., min_length=7, max_length=30)
-    email: EmailStr
+    email: EmailStr | None = None
     comment: str | None = Field(None, max_length=1000)
     items: list[OrderItemIn] = Field(..., min_length=1)
     promo_code: str | None = Field(None, max_length=50)

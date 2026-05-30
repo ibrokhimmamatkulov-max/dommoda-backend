@@ -44,12 +44,12 @@ class Order(Base):
     # Contact info
     recipient_name: Mapped[str] = mapped_column(String(200), nullable=False)
     phone: Mapped[str] = mapped_column(String(30), nullable=False)
-    email: Mapped[str] = mapped_column(String(200), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Delivery address
     city: Mapped[str] = mapped_column(String(200), nullable=False)
-    street: Mapped[str] = mapped_column(String(300), nullable=False)
-    building: Mapped[str] = mapped_column(String(50), nullable=False)
+    street: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    building: Mapped[str | None] = mapped_column(String(50), nullable=True)
     apartment: Mapped[str | None] = mapped_column(String(50), nullable=True)
     zip_code: Mapped[str] = mapped_column(String(20), nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
