@@ -32,55 +32,52 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"chat_id\":\"${CHAT_ID}\",\"text\":\"${MSG}\",\"parse_mode\":\"Markdown\"}"
 
-      - name: Simulate failure
-        if: github.event.inputs.simulate_failure == 'true'
-        id: backend
-        run: |
-          echo "status=error" >> $GITHUB_OUTPUT
-          echo "http_code=503" >> $GITHUB_OUTPUT
-          echo "elapsed=0" >> $GITHUB_OUTPUT
-
-      - name: Simulate frontend failure
-        if: github.event.inputs.simulate_failure == 'true'
-        id: frontend
-        run: |
-          echo "status=error" >> $GITHUB_OUTPUT
-          echo "http_code=503" >> $GITHUB_OUTPUT
-
       - name: Check backend API
-        if: github.event.inputs.test_alert != 'true' && github.event.inputs.simulate_failure != 'true'
+        if: github.event.inputs.test_alert != 'true'
         id: backend
         run: |
-          START=$(date +%s)
-          HTTP_CODE=$(curl -s -o /tmp/backend.json -w "%{http_code}" --max-time 90 "https://backanddommoda.onrender.com/api/products?limit=1")
-          END=$(date +%s)
-          ELAPSED=$((END - START))
-          echo "elapsed=${ELAPSED}" >> $GITHUB_OUTPUT
-          echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
-          if [ "$HTTP_CODE" != "200" ]; then
+          if [ "${{ github.event.inputs.simulate_failure }}" = "true" ]; then
             echo "status=error" >> $GITHUB_OUTPUT
+            echo "http_code=503" >> $GITHUB_OUTPUT
+            echo "elapsed=0" >> $GITHUB_OUTPUT
+            echo "products_total=0" >> $GITHUB_OUTPUT
           else
-            TOTAL=$(python3 -c "import json; d=json.load(open('/tmp/backend.json')); print(d.get('total',0))")
-            echo "products_total=${TOTAL}" >> $GITHUB_OUTPUT
-            if [ "$TOTAL" = "0" ]; then
-              echo "status=no_products" >> $GITHUB_OUTPUT
-            elif [ "$ELAPSED" -gt "30" ]; then
-              echo "status=slow" >> $GITHUB_OUTPUT
+            START=$(date +%s)
+            HTTP_CODE=$(curl -s -o /tmp/backend.json -w "%{http_code}" --max-time 90 "https://backanddommoda.onrender.com/api/products?limit=1")
+            END=$(date +%s)
+            ELAPSED=$((END - START))
+            echo "elapsed=${ELAPSED}" >> $GITHUB_OUTPUT
+            echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "status=error" >> $GITHUB_OUTPUT
             else
-              echo "status=ok" >> $GITHUB_OUTPUT
+              TOTAL=$(python3 -c "import json; d=json.load(open('/tmp/backend.json')); print(d.get('total',0))")
+              echo "products_total=${TOTAL}" >> $GITHUB_OUTPUT
+              if [ "$TOTAL" = "0" ]; then
+                echo "status=no_products" >> $GITHUB_OUTPUT
+              elif [ "$ELAPSED" -gt "30" ]; then
+                echo "status=slow" >> $GITHUB_OUTPUT
+              else
+                echo "status=ok" >> $GITHUB_OUTPUT
+              fi
             fi
           fi
 
       - name: Check frontend
-        if: github.event.inputs.test_alert != 'true' && github.event.inputs.simulate_failure != 'true'
+        if: github.event.inputs.test_alert != 'true'
         id: frontend
         run: |
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://dommoda.vercel.app")
-          echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "status=ok" >> $GITHUB_OUTPUT
-          else
+          if [ "${{ github.event.inputs.simulate_failure }}" = "true" ]; then
             echo "status=error" >> $GITHUB_OUTPUT
+            echo "http_code=503" >> $GITHUB_OUTPUT
+          else
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://dommoda.vercel.app")
+            echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "status=ok" >> $GITHUB_OUTPUT
+            else
+              echo "status=error" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Alert on critical failure
