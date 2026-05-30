@@ -42,12 +42,12 @@ class OrderItemIn(BaseModel):
 
 class CreateOrderRequest(BaseModel):
     delivery_method: str = Field(..., pattern="^(courier|pickup|post)$")
-    city: str = Field(..., min_length=1, max_length=200)
+    city: str | None = Field(None, max_length=200)
     street: str | None = Field(None, max_length=300)
     building: str | None = Field(None, max_length=50)
     apartment: str | None = Field(None, max_length=50)
     zip_code: str | None = Field(None, max_length=20)
-    recipient_name: str = Field(..., min_length=2, max_length=200)
+    recipient_name: str | None = Field(None, max_length=200)
     phone: str = Field(..., min_length=7, max_length=30)
     email: EmailStr | None = None
     comment: str | None = Field(None, max_length=1000)
