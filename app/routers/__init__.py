@@ -6,6 +6,7 @@ from app.routers.products import router as products_router
 from app.routers.promo import router as promo_router
 from app.routers.settings import router as settings_router
 from app.routers.analytics import router as analytics_router
+from app.routers.user_auth import router as user_auth_router
 
 __all__ = [
     "admin_router",

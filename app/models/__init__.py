@@ -10,6 +10,7 @@ from app.models.product import Product
 from app.models.promo import PromoCode
 from app.models.setting import SiteSetting
 from app.models.analytics import AnalyticsEvent
+from app.models.user import User
 
 __all__ = [
     "Category",

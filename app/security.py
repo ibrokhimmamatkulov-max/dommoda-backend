@@ -26,6 +26,22 @@ def create_admin_access_token() -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm=_ALGORITHM)
 
 
+def create_user_access_token(phone: str) -> str:
+    expire = _utcnow() + timedelta(days=30)
+    payload: dict[str, object] = {"sub": phone, "type": "user_access", "exp": expire}
+    return jwt.encode(payload, settings.jwt_secret, algorithm=_ALGORITHM)
+
+
+def decode_user_token(token: str) -> str:
+    payload = jwt.decode(token, settings.jwt_secret, algorithms=[_ALGORITHM])
+    if payload.get("type") != "user_access":
+        raise JWTError("Invalid token type")
+    sub: str | None = payload.get("sub")
+    if sub is None:
+        raise JWTError("Token missing subject")
+    return sub
+
+
 def decode_admin_token(token: str) -> str:
     """Decode and validate an admin JWT.
 
