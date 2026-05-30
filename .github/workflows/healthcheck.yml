@@ -9,6 +9,10 @@ on:
         description: 'Отправить тестовое уведомление в Telegram'
         type: boolean
         default: false
+      simulate_failure:
+        description: 'Симулировать падение сайта (для проверки алерта)'
+        type: boolean
+        default: false
 
 jobs:
   check:
@@ -28,8 +32,23 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"chat_id\":\"${CHAT_ID}\",\"text\":\"${MSG}\",\"parse_mode\":\"Markdown\"}"
 
+      - name: Simulate failure
+        if: github.event.inputs.simulate_failure == 'true'
+        id: backend
+        run: |
+          echo "status=error" >> $GITHUB_OUTPUT
+          echo "http_code=503" >> $GITHUB_OUTPUT
+          echo "elapsed=0" >> $GITHUB_OUTPUT
+
+      - name: Simulate frontend failure
+        if: github.event.inputs.simulate_failure == 'true'
+        id: frontend
+        run: |
+          echo "status=error" >> $GITHUB_OUTPUT
+          echo "http_code=503" >> $GITHUB_OUTPUT
+
       - name: Check backend API
-        if: github.event.inputs.test_alert != 'true'
+        if: github.event.inputs.test_alert != 'true' && github.event.inputs.simulate_failure != 'true'
         id: backend
         run: |
           START=$(date +%s)
@@ -53,7 +72,7 @@ jobs:
           fi
 
       - name: Check frontend
-        if: github.event.inputs.test_alert != 'true'
+        if: github.event.inputs.test_alert != 'true' && github.event.inputs.simulate_failure != 'true'
         id: frontend
         run: |
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://dommoda.vercel.app")
