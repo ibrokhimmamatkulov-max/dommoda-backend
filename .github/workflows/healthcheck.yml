@@ -17,19 +17,19 @@ jobs:
 
     steps:
       - name: Send test alert
-        if: ${{ github.event.inputs.test_alert == 'true' }}
+        if: github.event.inputs.test_alert == 'true'
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           TIME=$(date -u '+%d.%m.%Y %H:%M UTC')
-          MSG=$(printf '✅ *Dommoda — тест уведомлений*\n\nЕсли видишь это сообщение — мониторинг настроен правильно\!\n\n🕐 %s' "$TIME")
+          MSG=$(printf '✅ *Dommoda — тест уведомлений*\n\nЕсли видишь это — мониторинг работает правильно\!\n\n🕐 %s' "$TIME")
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             -H "Content-Type: application/json" \
             -d "{\"chat_id\":\"${CHAT_ID}\",\"text\":\"${MSG}\",\"parse_mode\":\"Markdown\"}"
 
       - name: Check backend API
-        if: ${{ github.event.inputs.test_alert != 'true' }}
+        if: github.event.inputs.test_alert != 'true'
         id: backend
         run: |
           START=$(date +%s)
@@ -41,7 +41,7 @@ jobs:
           if [ "$HTTP_CODE" != "200" ]; then
             echo "status=error" >> $GITHUB_OUTPUT
           else
-            TOTAL=$(python3 -c "import sys,json; d=json.load(open('/tmp/backend.json')); print(d.get('total',0))")
+            TOTAL=$(python3 -c "import json; d=json.load(open('/tmp/backend.json')); print(d.get('total',0))")
             echo "products_total=${TOTAL}" >> $GITHUB_OUTPUT
             if [ "$TOTAL" = "0" ]; then
               echo "status=no_products" >> $GITHUB_OUTPUT
@@ -53,7 +53,7 @@ jobs:
           fi
 
       - name: Check frontend
-        if: ${{ github.event.inputs.test_alert != 'true' }}
+        if: github.event.inputs.test_alert != 'true'
         id: frontend
         run: |
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://dommoda.vercel.app")
@@ -65,7 +65,7 @@ jobs:
           fi
 
       - name: Alert on critical failure
-        if: ${{ github.event.inputs.test_alert != 'true' }} && (steps.backend.outputs.status == 'error' || steps.backend.outputs.status == 'no_products' || steps.frontend.outputs.status == 'error')
+        if: github.event.inputs.test_alert != 'true' && (steps.backend.outputs.status == 'error' || steps.backend.outputs.status == 'no_products' || steps.frontend.outputs.status == 'error')
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -91,7 +91,7 @@ jobs:
             -d "{\"chat_id\":\"${CHAT_ID}\",\"text\":\"${MSG}\",\"parse_mode\":\"Markdown\"}"
 
       - name: Alert on slow backend
-        if: ${{ github.event.inputs.test_alert != 'true' }} && steps.backend.outputs.status == 'slow'
+        if: github.event.inputs.test_alert != 'true' && steps.backend.outputs.status == 'slow'
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
