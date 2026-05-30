@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: 'Отправить тестовое уведомление в Telegram'
+        type: boolean
+        default: false
 
 jobs:
   check:
@@ -11,7 +16,20 @@ jobs:
     timeout-minutes: 3
 
     steps:
+      - name: Send test alert
+        if: ${{ github.event.inputs.test_alert == 'true' }}
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          TIME=$(date -u '+%d.%m.%Y %H:%M UTC')
+          MSG=$(printf '✅ *Dommoda — тест уведомлений*\n\nЕсли видишь это сообщение — мониторинг настроен правильно\!\n\n🕐 %s' "$TIME")
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${CHAT_ID}\",\"text\":\"${MSG}\",\"parse_mode\":\"Markdown\"}"
+
       - name: Check backend API
+        if: ${{ github.event.inputs.test_alert != 'true' }}
         id: backend
         run: |
           START=$(date +%s)
@@ -35,6 +53,7 @@ jobs:
           fi
 
       - name: Check frontend
+        if: ${{ github.event.inputs.test_alert != 'true' }}
         id: frontend
         run: |
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://dommoda.vercel.app")
@@ -46,7 +65,7 @@ jobs:
           fi
 
       - name: Alert on critical failure
-        if: steps.backend.outputs.status == 'error' || steps.backend.outputs.status == 'no_products' || steps.frontend.outputs.status == 'error'
+        if: ${{ github.event.inputs.test_alert != 'true' }} && (steps.backend.outputs.status == 'error' || steps.backend.outputs.status == 'no_products' || steps.frontend.outputs.status == 'error')
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -72,7 +91,7 @@ jobs:
             -d "{\"chat_id\":\"${CHAT_ID}\",\"text\":\"${MSG}\",\"parse_mode\":\"Markdown\"}"
 
       - name: Alert on slow backend
-        if: steps.backend.outputs.status == 'slow'
+        if: ${{ github.event.inputs.test_alert != 'true' }} && steps.backend.outputs.status == 'slow'
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
