@@ -41,16 +41,6 @@ async def track_event(body: TrackRequest, db: DB) -> dict:
     if body.event_type not in allowed:
         return {"ok": False}
 
-    # Для "visit" — проверяем не было ли уже события от этой сессии
-    if body.event_type == "visit":
-        existing = await db.execute(
-            select(AnalyticsEvent).where(
-                AnalyticsEvent.session_id == body.session_id,
-                AnalyticsEvent.event_type == "visit",
-            ).limit(1)
-        )
-        if existing.scalar_one_or_none() is not None:
-            return {"ok": True, "skipped": True}
 
     event = AnalyticsEvent(
         event_type=body.event_type,
