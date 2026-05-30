@@ -13,6 +13,35 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 DB = Annotated[AsyncSession, Depends(get_db)]
 Admin = Annotated[str, Depends(get_current_admin)]
 
+DEFAULT_CURRENCY = {"rub_to_tjs": 0.11}
+
+
+class CurrencyUpdate(BaseModel):
+    rub_to_tjs: float
+
+
+@router.get("/currency")
+async def get_currency(db: DB) -> dict:
+    row = await db.get(SiteSetting, "currency")
+    if row is None:
+        return DEFAULT_CURRENCY
+    return json.loads(row.value)
+
+
+@router.put("/currency")
+async def update_currency(_admin: Admin, db: DB, body: CurrencyUpdate) -> dict:
+    data = {"rub_to_tjs": body.rub_to_tjs}
+    row = await db.get(SiteSetting, "currency")
+    if row is None:
+        db.add(SiteSetting(key="currency", value=json.dumps(data)))
+    else:
+        row.value = json.dumps(data)
+    await db.flush()
+    return data
+
+DB = Annotated[AsyncSession, Depends(get_db)]
+Admin = Annotated[str, Depends(get_current_admin)]
+
 DEFAULT_BANNER = {
     "imageUrl": "https://placehold.co/600x600/000000/ffffff?text=DOMMODA",
     "badgeText": "-70%",
