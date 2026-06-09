@@ -287,6 +287,19 @@ async def admin_delete_product(
     await db.flush()
 
 
+@router.delete(
+    "/products",
+    status_code=status.HTTP_200_OK,
+    summary="Delete ALL products — admin only",
+)
+async def admin_delete_all_products(_admin: Admin, db: DB) -> dict:
+    """Hard-delete every row from the products table."""
+    from sqlalchemy import delete as sa_delete
+    result = await db.execute(sa_delete(Product))
+    await db.flush()
+    return {"deleted": result.rowcount}
+
+
 # ---------------------------------------------------------------------------
 # Orders
 # ---------------------------------------------------------------------------
