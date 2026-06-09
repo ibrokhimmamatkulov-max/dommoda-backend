@@ -2,7 +2,7 @@ services:
   - type: web
     name: dommoda-backend
     runtime: python
-    buildCommand: pip install -r requirements.txt && alembic stamp 001 || true && alembic upgrade head && python seed.py
+    buildCommand: pip install -r requirements.txt && python seed.py
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ADMIN_LOGIN
