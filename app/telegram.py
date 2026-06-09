@@ -23,10 +23,15 @@ async def send_order_notification(order) -> None:
     delivery_labels = {"courier": "Курьер", "pickup": "Самовывоз", "post": "Почта"}
     delivery = delivery_labels.get(str(order.delivery_method.value if hasattr(order.delivery_method, 'value') else order.delivery_method), str(order.delivery_method))
 
-    items_text = "\n".join(
-        f"  • {item['brand']} {item['product_name']} ({item['size']}, {item['color']}) × {item['quantity']} — {item['unit_price'] * item['quantity']:,} ₽"
-        for item in order.items
-    )
+    def _item_line(item: dict) -> str:
+        sku = item.get("sku")
+        sku_str = f" `{sku}`" if sku else ""
+        return (
+            f"  • {item['brand']} {item['product_name']}{sku_str}\n"
+            f"    {item['size']} · {item['color']} · ×{item['quantity']} — {item['unit_price'] * item['quantity']:,} ₽"
+        )
+
+    items_text = "\n".join(_item_line(item) for item in order.items)
 
     text = (
         f"🛍 *Новый заказ {order.id}*\n\n"

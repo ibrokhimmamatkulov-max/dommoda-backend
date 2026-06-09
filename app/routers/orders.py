@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.order import DeliveryMethod, Order, OrderStatus
+from app.models.product import Product
 from app.schemas.order import CreateOrderRequest, OrderItemOut, OrderOut
 from app.telegram import send_telegram
 
@@ -54,7 +55,21 @@ async def create_order(body: CreateOrderRequest, db: DB) -> OrderOut:
         promo_code=body.promo_code,
         total=total,
     )
-    order.items = [item.model_dump() for item in body.items]
+    # Fetch SKU for each product so it appears in the Telegram notification
+    product_ids = [item.product_id for item in body.items]
+    sku_map: dict[str, str | None] = {}
+    if product_ids:
+        result_skus = await db.execute(
+            select(Product.id, Product.sku).where(Product.id.in_(product_ids))
+        )
+        sku_map = {row.id: row.sku for row in result_skus}
+
+    items_data = []
+    for item in body.items:
+        d = item.model_dump()
+        d["sku"] = sku_map.get(item.product_id)
+        items_data.append(d)
+    order.items = items_data
 
     db.add(order)
     await db.flush()

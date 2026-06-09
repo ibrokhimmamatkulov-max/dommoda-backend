@@ -25,6 +25,7 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(500), nullable=False)
     category: Mapped[str] = mapped_column(String(50), nullable=False)
     subcategory: Mapped[str] = mapped_column(String(50), nullable=False)
+    sku: Mapped[str | None] = mapped_column(String(100), nullable=True)
     price: Mapped[int] = mapped_column(Integer, nullable=False)
     price_original: Mapped[int | None] = mapped_column(Integer, nullable=True)
     discount_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)

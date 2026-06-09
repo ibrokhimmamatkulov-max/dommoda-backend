@@ -184,6 +184,7 @@ async def admin_create_product(
         brand=body.brand,
         category=body.category,
         subcategory=body.subcategory,
+        sku=body.sku,
         price=body.price,
         price_original=body.price_original,
         discount_percent=discount_percent,

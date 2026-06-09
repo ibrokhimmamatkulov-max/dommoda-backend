@@ -32,6 +32,7 @@ class ProductCreate(BaseModel):
     brand: str = Field(..., min_length=1, max_length=200)
     category: str = Field(..., description="women / men / kids / sport")
     subcategory: str
+    sku: str | None = None
     price: int = Field(..., gt=0)
     price_original: int | None = None
     description: str = ""

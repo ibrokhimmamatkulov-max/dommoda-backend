@@ -25,6 +25,7 @@ class ProductOut(BaseModel):
     name: str
     category: str
     subcategory: str
+    sku: str | None = None
     price: int
     price_original: int | None = Field(None, alias="priceOriginal")
     discount_percent: int | None = Field(None, alias="discountPercent")
@@ -50,6 +51,7 @@ class ProductOut(BaseModel):
             name=product.name,
             category=product.category,
             subcategory=product.subcategory,
+            sku=product.sku,
             price=product.price,
             priceOriginal=product.price_original,
             discountPercent=product.discount_percent,
