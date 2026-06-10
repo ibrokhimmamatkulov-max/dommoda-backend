@@ -41,8 +41,13 @@ async def seed() -> None:
     from app.database import async_session_factory, engine, Base
     import app.models  # noqa: F401
 
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Idempotent migrations for existing DBs
+        await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS sku VARCHAR(100)"))
+        await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_original INTEGER"))
+        await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_percent INTEGER"))
 
     from app.models.product import Product
     from app.models.category import Category
