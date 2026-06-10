@@ -1,0 +1,78 @@
+name: Nightly Size Sync
+
+on:
+  schedule:
+    # 03:00 Dushanbe time (UTC+5) = 22:00 UTC
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Wake up backend
+        run: |
+          echo "Waking up Render backend..."
+          for i in 1 2 3; do
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 \
+              "https://backanddommoda.onrender.com/api/products?limit=1")
+            if [ "$HTTP" = "200" ]; then
+              echo "Backend is up (attempt $i)"
+              break
+            fi
+            echo "Attempt $i: HTTP $HTTP, retrying in 30s..."
+            sleep 30
+          done
+
+      - name: Get admin token
+        id: auth
+        env:
+          ADMIN_LOGIN: ${{ secrets.ADMIN_LOGIN }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          TOKEN=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"login\":\"${ADMIN_LOGIN}\",\"password\":\"${ADMIN_PASSWORD}\"}" \
+            "https://backanddommoda.onrender.com/api/admin/login" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))")
+          if [ -z "$TOKEN" ]; then
+            echo "Failed to get admin token"
+            exit 1
+          fi
+          echo "TOKEN=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Run size sync
+        id: sync
+        run: |
+          RESULT=$(curl -s -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.TOKEN }}" \
+            --max-time 600 \
+            "https://backanddommoda.onrender.com/api/admin/sync-sizes")
+          echo "Result: $RESULT"
+          UPDATED=$(echo "$RESULT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('updated',0))")
+          SKIPPED=$(echo "$RESULT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('skipped',0))")
+          ERRORS=$(echo "$RESULT"  | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('errors',0))")
+          TOTAL=$(echo "$RESULT"   | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('total',0))")
+          echo "updated=$UPDATED"  >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED"  >> $GITHUB_OUTPUT
+          echo "errors=$ERRORS"    >> $GITHUB_OUTPUT
+          echo "total=$TOTAL"      >> $GITHUB_OUTPUT
+
+      - name: Notify on error
+        if: failure() || steps.sync.outputs.errors != '0'
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          TIME=$(date -u '+%d.%m.%Y %H:%M UTC')
+          MSG=$(printf '⚠️ *Dommoda — синк размеров с ошибками*\n\n✅ %s обновлено\n❌ %s ошибок\n⏭ %s пропущено\n📦 %s всего\n\n🕐 %s' \
+            "${{ steps.sync.outputs.updated }}" \
+            "${{ steps.sync.outputs.errors }}" \
+            "${{ steps.sync.outputs.skipped }}" \
+            "${{ steps.sync.outputs.total }}" \
+            "$TIME")
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${CHAT_ID}\",\"text\":\"${MSG}\",\"parse_mode\":\"Markdown\"}"

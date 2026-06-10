@@ -6,10 +6,12 @@ All product-mutating endpoints require a valid admin JWT delivered as
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Annotated
 from uuid import uuid4
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +30,7 @@ from app.schemas.admin import (
 )
 from app.schemas.product import ProductOut
 from app.security import create_admin_access_token
+from app.services.lamoda_sync import apply_availability, fetch_lamoda_availability
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -350,3 +353,67 @@ async def admin_update_order_status(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
     await db.flush()
     return {"id": order.id, "status": order.status.value}
+
+
+# ---------------------------------------------------------------------------
+# Size sync
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/sync-sizes",
+    response_model=dict,
+    summary="Sync size availability for discounted products from Lamoda — admin only",
+)
+async def sync_sizes(_admin: Admin, db: DB) -> dict:
+    """Fetch current size availability from lamoda.ru for all discounted products
+    that have a SKU. Updates sizes_json in place. Safe to re-run."""
+    result = await db.execute(
+        select(Product)
+        .where(Product.discount_percent > 0)
+        .where(Product.sku.isnot(None))
+        .where(Product.sku != "")
+        .where(Product.in_stock.is_(True))
+    )
+    products = result.scalars().all()
+
+    if not products:
+        return {"updated": 0, "skipped": 0, "errors": 0, "total": 0}
+
+    updated = 0
+    skipped = 0
+    errors = 0
+    error_skus: list[str] = []
+
+    async with httpx.AsyncClient() as client:
+        for product in products:
+            try:
+                availability = await fetch_lamoda_availability(product.sku, client)
+                if availability is None:
+                    skipped += 1
+                else:
+                    product.sizes = apply_availability(product.sizes, availability)
+                    await db.flush()
+                    updated += 1
+            except Exception as exc:
+                errors += 1
+                error_skus.append(f"{product.sku}: {exc}")
+
+            await asyncio.sleep(0.8)
+
+    from app.telegram import send_telegram
+    await send_telegram(
+        f"🔄 *Dommoda — синк размеров завершён*\n\n"
+        f"✅ Обновлено: {updated}\n"
+        f"⏭ Пропущено: {skipped}\n"
+        f"❌ Ошибок: {errors}\n"
+        f"📦 Всего товаров: {len(products)}"
+    )
+
+    return {
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors,
+        "total": len(products),
+        "error_skus": error_skus[:10],
+    }
