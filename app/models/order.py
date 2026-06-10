@@ -53,7 +53,7 @@ class Order(Base):
     street: Mapped[str | None] = mapped_column(String(300), nullable=True)
     building: Mapped[str | None] = mapped_column(String(50), nullable=True)
     apartment: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    zip_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    zip_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Pricing (stored in kopecks / smallest currency unit)

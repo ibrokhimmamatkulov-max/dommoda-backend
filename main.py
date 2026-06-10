@@ -46,9 +46,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Idempotent column additions for existing DBs (safe to run every startup)
+        # Idempotent column additions / constraint fixes for existing DBs
         await conn.execute(text(
             "ALTER TABLE products ADD COLUMN IF NOT EXISTS sku VARCHAR(100)"
+        ))
+        # Make zip_code nullable (was incorrectly NOT NULL)
+        await conn.execute(text(
+            "ALTER TABLE orders ALTER COLUMN zip_code DROP NOT NULL"
         ))
     yield
     await engine.dispose()
