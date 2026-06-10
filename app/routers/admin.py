@@ -365,16 +365,24 @@ async def admin_update_order_status(
     response_model=dict,
     summary="Sync size availability for discounted products from Lamoda — admin only",
 )
-async def sync_sizes(_admin: Admin, db: DB) -> dict:
+async def sync_sizes(
+    _admin: Admin,
+    db: DB,
+    limit: int | None = Query(None, ge=1, description="Cap number of products to sync (newest first). Omit for all."),
+) -> dict:
     """Fetch current size availability from lamoda.ru for all discounted products
     that have a SKU. Updates sizes_json in place. Safe to re-run."""
-    result = await db.execute(
+    stmt = (
         select(Product)
         .where(Product.discount_percent > 0)
         .where(Product.sku.isnot(None))
         .where(Product.sku != "")
         .where(Product.in_stock.is_(True))
+        .order_by(Product.created_at.desc())
     )
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    result = await db.execute(stmt)
     products = result.scalars().all()
 
     if not products:
