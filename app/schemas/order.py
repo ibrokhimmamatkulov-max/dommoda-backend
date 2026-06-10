@@ -78,14 +78,14 @@ class OrderOut(BaseModel):
     id: str
     status: str
     delivery_method: str
-    recipient_name: str
+    recipient_name: str | None
     phone: str
-    email: str
-    city: str
-    street: str
-    building: str
+    email: str | None
+    city: str | None
+    street: str | None
+    building: str | None
     apartment: str | None
-    zip_code: str
+    zip_code: str | None
     comment: str | None
     subtotal: int
     promo_discount: int

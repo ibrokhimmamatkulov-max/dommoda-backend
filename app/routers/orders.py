@@ -73,6 +73,7 @@ async def create_order(body: CreateOrderRequest, db: DB) -> OrderOut:
 
     db.add(order)
     await db.flush()
+    await db.commit()
     await db.refresh(order)
 
     from app.telegram import send_order_notification
