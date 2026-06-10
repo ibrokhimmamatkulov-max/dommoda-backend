@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,7 +13,6 @@ from app.schemas.product import ProductListOut, ProductOut
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 
-# Dependency alias for cleaner signatures
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 SortParam = Literal["popular", "price_asc", "price_desc", "new"]
@@ -25,7 +25,6 @@ SortParam = Literal["popular", "price_asc", "price_desc", "new"]
     summary="Get featured products for the home page (top 4 by review count)",
 )
 async def get_featured_products(db: DB) -> list[ProductOut]:
-    """Return the 4 most-reviewed in-stock products for the homepage banner."""
     result = await db.execute(
         select(Product)
         .where(Product.in_stock.is_(True))
@@ -37,16 +36,27 @@ async def get_featured_products(db: DB) -> list[ProductOut]:
 
 
 @router.get(
+    "/brands",
+    response_model=list[dict],
+    summary="List all brands with product counts",
+)
+async def list_brands(db: DB) -> list[dict]:
+    result = await db.execute(
+        select(Product.brand, func.count(Product.id).label("count"))
+        .where(Product.in_stock.is_(True))
+        .group_by(Product.brand)
+        .order_by(Product.brand.asc())
+    )
+    return [{"name": row.brand, "count": row.count} for row in result.all()]
+
+
+@router.get(
     "/{product_id}",
     response_model=ProductOut,
     response_model_by_alias=True,
     summary="Get a single product by ID",
 )
 async def get_product(product_id: str, db: DB) -> ProductOut:
-    """Return a product by its string ID.
-
-    Raises 404 if the product does not exist.
-    """
     result = await db.execute(
         select(Product).where(Product.id == product_id)
     )
@@ -69,9 +79,13 @@ async def list_products(
     db: DB,
     category: str | None = Query(None),
     subcategory: str | None = Query(None),
+    brand: str | None = Query(None, description="Filter by exact brand name"),
     search: str | None = Query(None, description="Search by name or brand"),
     sort: SortParam = Query("popular"),
     has_discount: bool | None = Query(None, description="Filter to only discounted items"),
+    size: str | None = Query(None, description="Filter to products where this size is available"),
+    min_price: int | None = Query(None, ge=0, description="Minimum price in RUB"),
+    max_price: int | None = Query(None, ge=0, description="Maximum price in RUB"),
     page: int = Query(1, ge=1),
     limit: int = Query(24, ge=1, le=100),
 ) -> ProductListOut:
@@ -81,12 +95,24 @@ async def list_products(
         stmt = stmt.where(Product.category == category)
     if subcategory is not None:
         stmt = stmt.where(Product.subcategory == subcategory)
+    if brand is not None:
+        stmt = stmt.where(Product.brand == brand)
     if has_discount is True:
         stmt = stmt.where(Product.discount_percent > 0)
+    if min_price is not None:
+        stmt = stmt.where(Product.price >= min_price)
+    if max_price is not None:
+        stmt = stmt.where(Product.price <= max_price)
     if search is not None and search.strip():
         pattern = f"%{search.strip()}%"
         stmt = stmt.where(
             or_(Product.name.ilike(pattern), Product.brand.ilike(pattern))
+        )
+    # Size filter: JSON contains the size label with available=true
+    # Uses PostgreSQL JSON operator — sizes_json is a TEXT column with JSON array
+    if size is not None:
+        stmt = stmt.where(
+            Product.sizes_json.contains(json.dumps({"label": size, "available": True}))
         )
 
     match sort:
@@ -96,14 +122,12 @@ async def list_products(
             stmt = stmt.order_by(Product.price.desc())
         case "new":
             stmt = stmt.order_by(Product.created_at.desc())
-        case _:  # "popular" — default
+        case _:
             stmt = stmt.order_by(Product.review_count.desc())
 
-    # Total count for pagination metadata
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total: int = (await db.execute(count_stmt)).scalar_one()
 
-    # Paginate
     offset = (page - 1) * limit
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)
