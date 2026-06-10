@@ -71,6 +71,7 @@ async def list_products(
     subcategory: str | None = Query(None),
     search: str | None = Query(None, description="Search by name or brand"),
     sort: SortParam = Query("popular"),
+    has_discount: bool | None = Query(None, description="Filter to only discounted items"),
     page: int = Query(1, ge=1),
     limit: int = Query(24, ge=1, le=100),
 ) -> ProductListOut:
@@ -80,6 +81,8 @@ async def list_products(
         stmt = stmt.where(Product.category == category)
     if subcategory is not None:
         stmt = stmt.where(Product.subcategory == subcategory)
+    if has_discount is True:
+        stmt = stmt.where(Product.discount_percent > 0)
     if search is not None and search.strip():
         pattern = f"%{search.strip()}%"
         stmt = stmt.where(
