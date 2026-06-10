@@ -46,8 +46,8 @@ DEFAULT_BANNER = {
     "imageUrl": "https://placehold.co/600x600/000000/ffffff?text=DOMMODA",
     "badgeText": "-70%",
     "headline": "НОВАЯ КОЛЛЕКЦИЯ",
-    "ctaText": "Смотреть",
-    "ctaUrl": "/catalog/women",
+    "ctaText": "Бренды",
+    "ctaUrl": "/catalog/brands",
 }
 
 
