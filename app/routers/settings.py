@@ -36,7 +36,7 @@ async def update_currency(_admin: Admin, db: DB, body: CurrencyUpdate) -> dict:
         db.add(SiteSetting(key="currency", value=json.dumps(data)))
     else:
         row.value = json.dumps(data)
-    await db.flush()
+    await db.commit()
     return data
 
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -75,5 +75,5 @@ async def update_banner(_admin: Admin, db: DB, body: BannerUpdate) -> dict:
         db.add(SiteSetting(key="banner", value=json.dumps(data)))
     else:
         row.value = json.dumps(data)
-    await db.flush()
+    await db.commit()
     return data
