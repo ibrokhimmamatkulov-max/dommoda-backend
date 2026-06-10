@@ -89,7 +89,16 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 @app.exception_handler(Exception)
 async def _all_exceptions(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    origin = request.headers.get("origin", "")
+    cors_headers: dict[str, str] = {}
+    if origin and origin in settings.get_cors_origins():
+        cors_headers["access-control-allow-origin"] = origin
+        cors_headers["access-control-allow-credentials"] = "true"
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=cors_headers,
+    )
 
 
 # ---------------------------------------------------------------------------
