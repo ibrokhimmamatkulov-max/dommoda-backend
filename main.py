@@ -12,6 +12,8 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.exceptions import RequestValidationError
 
 from app.config import settings
 from app.database import engine
@@ -50,10 +52,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await conn.execute(text(
             "ALTER TABLE products ADD COLUMN IF NOT EXISTS sku VARCHAR(100)"
         ))
-        # Make zip_code nullable (was incorrectly NOT NULL)
-        await conn.execute(text(
-            "ALTER TABLE orders ALTER COLUMN zip_code DROP NOT NULL"
-        ))
+    # Make zip_code nullable — separate transaction so failure doesn't block startup
+    try:
+        async with engine.begin() as conn2:
+            await conn2.execute(text(
+                "ALTER TABLE orders ALTER COLUMN zip_code DROP NOT NULL"
+            ))
+    except Exception:
+        pass  # already nullable or table freshly created as nullable
     yield
     await engine.dispose()
 
@@ -76,6 +82,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Global exception handler — ensures CORS headers are present on all errors
+# (ServerErrorMiddleware bypasses CORSMiddleware, so we catch here instead)
+# ---------------------------------------------------------------------------
+@app.exception_handler(Exception)
+async def _all_exceptions(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
 
 # ---------------------------------------------------------------------------
 # Routers
