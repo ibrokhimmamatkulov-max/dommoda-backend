@@ -97,9 +97,11 @@ async def _all_exceptions(request: Request, exc: Exception) -> JSONResponse:
     if origin and origin in settings.get_cors_origins():
         cors_headers["access-control-allow-origin"] = origin
         cors_headers["access-control-allow-credentials"] = "true"
+    import logging
+    logging.getLogger(__name__).exception("Unhandled error: %s", exc)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={"detail": "Internal server error", "debug": str(exc)},
         headers=cors_headers,
     )
 
