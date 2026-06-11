@@ -42,6 +42,13 @@ async def seed() -> None:
     import app.models  # noqa: F401
 
     from sqlalchemy import text
+    # ALTER TYPE cannot run inside a regular transaction on older PG — use its own connection
+    async with engine.connect() as conn:
+        try:
+            await conn.execute(text("ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'received'"))
+            await conn.commit()
+        except Exception:
+            await conn.rollback()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # Products
