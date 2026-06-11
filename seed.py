@@ -44,10 +44,21 @@ async def seed() -> None:
     from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Idempotent migrations for existing DBs
+        # Products
         await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS sku VARCHAR(100)"))
         await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_original INTEGER"))
         await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_percent INTEGER"))
+        # Orders — address + contact fields
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS recipient_name VARCHAR(200)"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS email VARCHAR(200)"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS city VARCHAR(200)"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS street VARCHAR(300)"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS building VARCHAR(50)"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS apartment VARCHAR(50)"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS zip_code VARCHAR(20)"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS comment TEXT"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_discount INTEGER NOT NULL DEFAULT 0"))
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code VARCHAR(50)"))
 
     from app.models.product import Product
     from app.models.category import Category
