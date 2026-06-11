@@ -402,11 +402,11 @@ async def sync_sizes(_admin: Admin) -> dict:
     summary="Re-fetch Lamoda pages and fix product categories by breadcrumbs — admin only",
 )
 async def reclassify_categories(_admin: Admin) -> dict:
-    """Visit each product's Lamoda page, read the BreadcrumbList JSON-LD, and
-    update category (men/women/kids/sport) from the actual section on Lamoda.
-    Brand-agnostic. Safe to re-run."""
-    import traceback
-    try:
-        return await run_reclassify()
-    except Exception as exc:
-        return {"error": str(exc), "traceback": traceback.format_exc()}
+    """Start background re-classification of all product categories from Lamoda breadcrumbs.
+    Returns immediately; result arrives via Telegram notification."""
+    import asyncio
+    from app.services.lamoda_sync import _reclassify_lock
+    if _reclassify_lock.locked():
+        return {"status": "already_running"}
+    asyncio.create_task(run_reclassify())
+    return {"status": "started"}
