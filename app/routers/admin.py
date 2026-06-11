@@ -405,4 +405,8 @@ async def reclassify_categories(_admin: Admin) -> dict:
     """Visit each product's Lamoda page, read the BreadcrumbList JSON-LD, and
     update category (men/women/kids/sport) from the actual section on Lamoda.
     Brand-agnostic. Safe to re-run."""
-    return await run_reclassify()
+    import traceback
+    try:
+        return await run_reclassify()
+    except Exception as exc:
+        return {"error": str(exc), "traceback": traceback.format_exc()}
