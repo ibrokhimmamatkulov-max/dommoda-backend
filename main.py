@@ -83,6 +83,41 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "UPDATE products SET sku = TRIM(SUBSTRING(description FROM 10)) "
             "WHERE sku IS NULL AND description LIKE 'Артикул: %'"
         ))
+        # Back-fill subcategory from product name keywords (idempotent — skips already-set rows)
+        _subcat_updates = [
+            ("dresses",   "платье"),
+            ("jeans",     "джинс"),
+            ("blouses",   "блуз"),
+            ("jackets",   "куртк"),
+            ("jackets",   "пальто"),
+            ("jackets",   "пуховик"),
+            ("jackets",   "пиджак"),
+            ("jackets",   "бомбер"),
+            ("shoes",     "кроссовк"),
+            ("shoes",     "туфл"),
+            ("shoes",     "ботинк"),
+            ("shoes",     "сапог"),
+            ("shoes",     "мокасин"),
+            ("pants",     "брюк"),
+            ("knitwear",  "свитер"),
+            ("knitwear",  "джемпер"),
+            ("knitwear",  "кардиган"),
+            ("shirts",    "рубашк"),
+            ("polo",      "поло"),
+            ("hoodies",   "худи"),
+            ("hoodies",   "свитшот"),
+            ("overalls",  "комбинезон"),
+            ("leggings",  "леггинс"),
+            ("leggings",  "тайтс"),
+            ("tshirts",   "футболк"),
+            ("shorts",    "шорт"),
+        ]
+        for subcat, keyword in _subcat_updates:
+            await conn.execute(text(
+                "UPDATE products SET subcategory = :subcat "
+                "WHERE (subcategory IS NULL OR subcategory = '') "
+                "AND LOWER(name) LIKE :pattern"
+            ), {"subcat": subcat, "pattern": f"%{keyword}%"})
     yield
     await engine.dispose()
 
