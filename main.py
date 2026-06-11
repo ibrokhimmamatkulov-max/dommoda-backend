@@ -194,6 +194,43 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "AND LOWER(name) LIKE :pattern"
             ), {"subcat": subcat, "pattern": f"%{keyword}%"})
 
+        # Fix missing subcategories not covered above
+        _extra_subcat = [
+            ("shoes",       "кед"),        # кеды, кедах
+            ("shoes",       "тапочк"),     # тапочки
+            ("shoes",       "сабо"),       # сабо
+            ("shoes",       "кроссовки"),
+            ("accessories", "бейсболк"),   # бейсболка
+            ("accessories", "носк"),       # носки (Columbia и пр.)
+        ]
+        for subcat, keyword in _extra_subcat:
+            await conn.execute(text(
+                "UPDATE products SET subcategory = :subcat "
+                "WHERE (subcategory IS NULL OR subcategory = '') "
+                "AND LOWER(name) LIKE :pattern"
+            ), {"subcat": subcat, "pattern": f"%{keyword}%"})
+
+        # Fix category: pure sport brands → "sport"
+        _sport_brands = ["Demix", "Matrix Sport", "Matrix", "Alpex"]
+        for brand in _sport_brands:
+            await conn.execute(text(
+                "UPDATE products SET category = 'sport' WHERE brand = :brand"
+            ), {"brand": brand})
+
+        # Fix category: products with "спортивн" in name → "sport"
+        await conn.execute(text(
+            "UPDATE products SET category = 'sport' "
+            "WHERE LOWER(name) LIKE '%спортивн%' "
+            "AND brand NOT IN ('Befree', 'Bershka', 'Zarina', 'Mango', 'Lime')"
+        ))
+
+        # Fix category: men-only brands always → "men"
+        _mens_brands = ["Henderson", "Zarina Man"]
+        for brand in _mens_brands:
+            await conn.execute(text(
+                "UPDATE products SET category = 'men' WHERE brand = :brand"
+            ), {"brand": brand})
+
     scheduler_task = asyncio.create_task(_size_sync_scheduler())
     yield
     scheduler_task.cancel()
