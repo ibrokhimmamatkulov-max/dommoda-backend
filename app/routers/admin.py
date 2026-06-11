@@ -28,7 +28,7 @@ from app.schemas.admin import (
 )
 from app.schemas.product import ProductOut
 from app.security import create_admin_access_token
-from app.services.lamoda_sync import run_full_sync
+from app.services.lamoda_sync import run_full_sync, run_reclassify
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -394,3 +394,15 @@ async def sync_sizes(_admin: Admin) -> dict:
     """Fetch current size availability from lamoda.ru for all discounted products
     that have a SKU. Updates sizes_json in place. Safe to re-run."""
     return await run_full_sync()
+
+
+@router.post(
+    "/reclassify",
+    response_model=dict,
+    summary="Re-fetch Lamoda pages and fix product categories by breadcrumbs — admin only",
+)
+async def reclassify_categories(_admin: Admin) -> dict:
+    """Visit each product's Lamoda page, read the BreadcrumbList JSON-LD, and
+    update category (men/women/kids/sport) from the actual section on Lamoda.
+    Brand-agnostic. Safe to re-run."""
+    return await run_reclassify()
