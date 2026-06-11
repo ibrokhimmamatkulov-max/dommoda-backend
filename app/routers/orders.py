@@ -3,9 +3,12 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models.order import DeliveryMethod, Order, OrderStatus
@@ -39,7 +42,7 @@ async def create_order(body: CreateOrderRequest, db: DB) -> OrderOut:
 
     order = Order(
         id=f"ORD-{uuid.uuid4().hex[:8].upper()}",
-        status=OrderStatus.CONFIRMED,
+        status=OrderStatus.RECEIVED,
         delivery_method=DeliveryMethod(body.delivery_method),
         recipient_name=body.recipient_name,
         phone=body.phone,

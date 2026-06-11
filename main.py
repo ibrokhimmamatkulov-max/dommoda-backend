@@ -46,6 +46,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run ``alembic upgrade head`` first.
     """
     from sqlalchemy import text
+    # ALTER TYPE must commit before other DDL; run in its own connection
+    async with engine.connect() as conn:
+        await conn.execute(text("ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'received' BEFORE 'pending'"))
+        await conn.commit()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # Products — idempotent column additions

@@ -337,6 +337,32 @@ async def admin_list_orders(_admin: Admin, db: DB) -> list[dict]:
     ]
 
 
+@router.patch("/orders/{order_id}/address", response_model=dict, summary="Update order address — admin only")
+async def admin_update_order_address(
+    order_id: str,
+    body: dict,
+    _admin: Admin,
+    db: DB,
+) -> dict:
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order: Order | None = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    for field in ("recipient_name", "city", "street", "building", "apartment", "comment"):
+        if field in body:
+            setattr(order, field, body[field] or None)
+    await db.flush()
+    return {
+        "id": order.id,
+        "recipient_name": order.recipient_name,
+        "city": order.city,
+        "street": order.street,
+        "building": order.building,
+        "apartment": order.apartment,
+        "comment": order.comment,
+    }
+
+
 @router.patch("/orders/{order_id}/status", response_model=dict, summary="Update order status — admin only")
 async def admin_update_order_status(
     order_id: str,
