@@ -52,6 +52,7 @@ class ProductUpdate(BaseModel):
     brand: str | None = Field(None, min_length=1, max_length=200)
     category: str | None = None
     subcategory: str | None = None
+    sku: str | None = None
     price: int | None = Field(None, gt=0)
     price_original: int | None = None
     description: str | None = None

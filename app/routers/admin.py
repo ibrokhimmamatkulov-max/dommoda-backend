@@ -82,6 +82,7 @@ def _product_to_dict(product: Product) -> dict:
         "brand": product.brand,
         "category": product.category,
         "subcategory": product.subcategory,
+        "sku": product.sku,
         "price": product.price,
         "price_original": product.price_original,
         "discount_percent": product.discount_percent,

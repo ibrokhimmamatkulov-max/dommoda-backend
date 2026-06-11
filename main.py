@@ -66,6 +66,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Drop NOT NULL from optional order fields (may have been created NOT NULL in earlier schema)
         for col in ("recipient_name", "email", "city", "street", "building", "apartment", "zip_code", "comment", "promo_code"):
             await conn.execute(text(f"ALTER TABLE orders ALTER COLUMN {col} DROP NOT NULL"))
+        # Back-fill sku from description "Артикул: XXX" for products parsed before the sku column was deployed
+        await conn.execute(text(
+            "UPDATE products SET sku = TRIM(SUBSTRING(description FROM 10)) "
+            "WHERE sku IS NULL AND description LIKE 'Артикул: %'"
+        ))
     yield
     await engine.dispose()
 
