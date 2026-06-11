@@ -6,7 +6,11 @@ Run with:
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import logging
 from contextlib import asynccontextmanager
+from datetime import date, datetime, timedelta, timezone
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
@@ -16,6 +20,35 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 
 from app.config import settings
+
+_logger = logging.getLogger(__name__)
+_TZ_DUSHANBE = timezone(timedelta(hours=5))
+
+
+async def _size_sync_scheduler() -> None:
+    """Check every 10 min; fire size sync at 01:00 Dushanbe time (UTC+5).
+
+    Render free tier kills the process after ~15 min of no HTTP traffic.
+    The GitHub Actions healthcheck pings at :00 and :30 every hour, so
+    the process restarts at 20:00 UTC = 01:00 Dushanbe.  The first loop
+    iteration runs immediately on startup — if it is 01:xx and the sync
+    has not run today, it fires right away.
+    """
+    last_run_date: date | None = None
+    while True:
+        try:
+            now = datetime.now(_TZ_DUSHANBE)
+            if now.hour == 1 and last_run_date != now.date():
+                last_run_date = now.date()
+                _logger.info("Scheduled size sync: starting")
+                from app.services.lamoda_sync import run_full_sync
+                await run_full_sync()
+                _logger.info("Scheduled size sync: complete")
+        except Exception as exc:
+            _logger.exception("Scheduled size sync error: %s", exc)
+        await asyncio.sleep(600)
+
+
 from app.database import engine
 from app.models import (  # noqa: F401 — import side-effect: registers metadata
     Category,
@@ -160,7 +193,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "WHERE (subcategory IS NULL OR subcategory = '') "
                 "AND LOWER(name) LIKE :pattern"
             ), {"subcat": subcat, "pattern": f"%{keyword}%"})
+
+    scheduler_task = asyncio.create_task(_size_sync_scheduler())
     yield
+    scheduler_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await scheduler_task
     await engine.dispose()
 
 

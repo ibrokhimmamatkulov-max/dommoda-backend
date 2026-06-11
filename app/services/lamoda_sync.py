@@ -5,6 +5,7 @@ JSON, and maps each SKU entry to {label, available}.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import Any
@@ -120,3 +121,75 @@ def apply_availability(
             # Size not listed on Lamoda — treat as out of stock
             updated.append({"label": label, "available": False})
     return updated
+
+
+# ---------------------------------------------------------------------------
+# Standalone sync job (used by both the HTTP endpoint and the scheduler)
+# ---------------------------------------------------------------------------
+
+_sync_lock = asyncio.Lock()
+
+
+async def run_full_sync() -> dict:
+    """Fetch current size availability for all discounted products and persist.
+
+    Uses an asyncio lock so concurrent calls (scheduler + manual trigger) are
+    safe — the second caller gets an immediate no-op response.
+    """
+    if _sync_lock.locked():
+        return {"updated": 0, "skipped": 0, "errors": 0, "total": 0, "already_running": True}
+
+    async with _sync_lock:
+        from app.database import AsyncSessionLocal
+        from app.models.product import Product
+        from app.telegram import send_telegram
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(Product)
+                .where(Product.discount_percent > 0)
+                .where(Product.sku.isnot(None))
+                .where(Product.sku != "")
+                .where(Product.in_stock.is_(True))
+                .order_by(Product.created_at.desc())
+            )
+            products = result.scalars().all()
+
+            if not products:
+                return {"updated": 0, "skipped": 0, "errors": 0, "total": 0}
+
+            updated = skipped = errors = 0
+            error_skus: list[str] = []
+
+            async with httpx.AsyncClient() as client:
+                for product in products:
+                    try:
+                        availability = await fetch_lamoda_availability(product.sku, client)
+                        if availability is None:
+                            skipped += 1
+                        else:
+                            product.sizes = apply_availability(product.sizes, availability)
+                            updated += 1
+                    except Exception as exc:
+                        errors += 1
+                        error_skus.append(f"{product.sku}: {exc}")
+                    await asyncio.sleep(0.8)
+
+            await db.commit()
+
+        await send_telegram(
+            f"🔄 *Dommoda — синк размеров завершён*\n\n"
+            f"✅ Обновлено: {updated}\n"
+            f"⏭ Пропущено: {skipped}\n"
+            f"❌ Ошибок: {errors}\n"
+            f"📦 Всего товаров: {len(products)}"
+        )
+
+        return {
+            "updated": updated,
+            "skipped": skipped,
+            "errors": errors,
+            "total": len(products),
+            "error_skus": error_skus[:10],
+        }
