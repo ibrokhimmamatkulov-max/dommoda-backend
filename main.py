@@ -116,40 +116,64 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "UPDATE products SET sku = TRIM(SUBSTRING(description FROM 10)) "
             "WHERE sku IS NULL AND description LIKE 'Артикул: %'"
         ))
-        # Back-fill subcategories by Russian keywords in product name (order matters — specific first)
-        # IDs match categories.json on the frontend
+
+        # ------------------------------------------------------------------ #
+        # STEP 1 — Fix CATEGORY (men / women / kids / sport) first.
+        # Subcategory backfill runs after so it works within the correct section.
+        # ------------------------------------------------------------------ #
+
+        # Men-only brands → always "men"
+        for brand in ("Henderson", "Zarina Man"):
+            await conn.execute(text(
+                "UPDATE products SET category = 'men' WHERE brand = :b"
+            ), {"b": brand})
+
+        # Women-only brands → always "women"
+        for brand in ("Zarina", "Lime", "Befree", "Mango"):
+            await conn.execute(text(
+                "UPDATE products SET category = 'women' WHERE brand = :b"
+            ), {"b": brand})
+
+        # Pure sport brands → "sport"
+        for brand in ("Demix", "Matrix Sport", "Matrix", "Alpex"):
+            await conn.execute(text(
+                "UPDATE products SET category = 'sport' WHERE brand = :b"
+            ), {"b": brand})
+
+        # Products with "спортивн" in name → "sport"
+        # (only if not already tagged as women — women's sportswear stays in women)
+        await conn.execute(text(
+            "UPDATE products SET category = 'sport' "
+            "WHERE LOWER(name) LIKE '%спортивн%' AND category != 'women'"
+        ))
+
+        # ------------------------------------------------------------------ #
+        # STEP 2 — Back-fill SUBCATEGORY by keywords in name.
+        # Order matters: specific patterns first, generic last.
+        # ------------------------------------------------------------------ #
         _subcat_updates = [
-            # specific / unique patterns first
             ("jumpsuits",  "комбинезон"),
             ("jumpsuits",  "сарафан"),
+            ("jumpsuits",  "боди"),
             ("blazers",    "жакет"),
+            ("blazers",    "костюм"),
             ("hoodies",    "худи"),
             ("hoodies",    "свитшот"),
+            ("hoodies",    "толстовк"),
             ("knitwear",   "свитер"),
             ("knitwear",   "джемпер"),
             ("knitwear",   "кардиган"),
             ("knitwear",   "пуловер"),
+            ("knitwear",   "водолазк"),
             ("dresses",    "платье"),
             ("skirts",     "юбк"),
             ("jeans",      "джинс"),
             ("leggings",   "леггинс"),
             ("leggings",   "тайтс"),
+            ("sport_sets", "спортивный костюм"),
             ("shorts",     "шорт"),
             ("pants",      "брюк"),
             ("pants",      "лосин"),
-            ("shoes",      "кроссовк"),
-            ("shoes",      "туфл"),
-            ("shoes",      "ботинк"),
-            ("shoes",      "сапог"),
-            ("shoes",      "мокасин"),
-            ("shoes",      "балетк"),
-            ("shoes",      "сандали"),
-            ("shoes",      "слипон"),
-            ("accessories","ремен"),
-            ("accessories","сумк"),
-            ("accessories","шарф"),
-            ("accessories","платок"),
-            ("sport_sets", "спортивный костюм"),
             ("jackets",    "куртк"),
             ("jackets",    "пальто"),
             ("jackets",    "пуховик"),
@@ -157,26 +181,38 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ("jackets",    "ветровк"),
             ("jackets",    "анорак"),
             ("jackets",    "пиджак"),
-            ("blazers",    "костюм"),
+            ("jackets",    "жилет"),
+            ("jackets",    "накидк"),
             ("shirts",     "рубашк"),
             ("blouses",    "блуз"),
             ("tshirts",    "футболк"),
             ("tshirts",    "майк"),
             ("tshirts",    "лонгслив"),
             ("tshirts",    "джерси"),
-            ("polo",       "поло"),
             ("tshirts",    " топ"),
-            ("hoodies",    "толстовк"),
-            ("knitwear",   "водолазк"),
-            ("jumpsuits",  "боди"),
-            ("jackets",    "жилет"),
-            ("jackets",    "накидк"),
+            ("polo",       "поло"),
+            ("shoes",      "кроссовк"),
+            ("shoes",      "кед"),
+            ("shoes",      "туфл"),
+            ("shoes",      "ботинк"),
+            ("shoes",      "сапог"),
+            ("shoes",      "мокасин"),
+            ("shoes",      "балетк"),
+            ("shoes",      "сандали"),
+            ("shoes",      "слипон"),
             ("shoes",      "сланц"),
             ("shoes",      "шлепанц"),
             ("shoes",      "слипер"),
+            ("shoes",      "тапочк"),
+            ("shoes",      "сабо"),
+            ("accessories","ремен"),
+            ("accessories","сумк"),
+            ("accessories","шарф"),
+            ("accessories","платок"),
             ("accessories","очки"),
             ("accessories","панам"),
             ("accessories","кепк"),
+            ("accessories","бейсболк"),
             ("accessories","шапк"),
             ("accessories","перчатк"),
             ("accessories","носк"),
@@ -193,43 +229,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "WHERE (subcategory IS NULL OR subcategory = '') "
                 "AND LOWER(name) LIKE :pattern"
             ), {"subcat": subcat, "pattern": f"%{keyword}%"})
-
-        # Fix missing subcategories not covered above
-        _extra_subcat = [
-            ("shoes",       "кед"),        # кеды, кедах
-            ("shoes",       "тапочк"),     # тапочки
-            ("shoes",       "сабо"),       # сабо
-            ("shoes",       "кроссовки"),
-            ("accessories", "бейсболк"),   # бейсболка
-            ("accessories", "носк"),       # носки (Columbia и пр.)
-        ]
-        for subcat, keyword in _extra_subcat:
-            await conn.execute(text(
-                "UPDATE products SET subcategory = :subcat "
-                "WHERE (subcategory IS NULL OR subcategory = '') "
-                "AND LOWER(name) LIKE :pattern"
-            ), {"subcat": subcat, "pattern": f"%{keyword}%"})
-
-        # Fix category: pure sport brands → "sport"
-        _sport_brands = ["Demix", "Matrix Sport", "Matrix", "Alpex"]
-        for brand in _sport_brands:
-            await conn.execute(text(
-                "UPDATE products SET category = 'sport' WHERE brand = :brand"
-            ), {"brand": brand})
-
-        # Fix category: products with "спортивн" in name → "sport"
-        await conn.execute(text(
-            "UPDATE products SET category = 'sport' "
-            "WHERE LOWER(name) LIKE '%спортивн%' "
-            "AND brand NOT IN ('Befree', 'Bershka', 'Zarina', 'Mango', 'Lime')"
-        ))
-
-        # Fix category: men-only brands always → "men"
-        _mens_brands = ["Henderson", "Zarina Man"]
-        for brand in _mens_brands:
-            await conn.execute(text(
-                "UPDATE products SET category = 'men' WHERE brand = :brand"
-            ), {"brand": brand})
 
     scheduler_task = asyncio.create_task(_size_sync_scheduler())
     yield
