@@ -73,6 +73,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS comment TEXT"))
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_discount INTEGER NOT NULL DEFAULT 0"))
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code VARCHAR(50)"))
+        # Ensure updated_at column exists (may be missing on older instances)
+        await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"))
         # Drop NOT NULL from optional order fields (may have been created NOT NULL in earlier schema)
         for col in ("recipient_name", "email", "city", "street", "building", "apartment", "zip_code", "comment", "promo_code"):
             await conn.execute(text(f"ALTER TABLE orders ALTER COLUMN {col} DROP NOT NULL"))

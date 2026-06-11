@@ -42,7 +42,7 @@ async def create_order(body: CreateOrderRequest, db: DB) -> OrderOut:
 
     order = Order(
         id=f"ORD-{uuid.uuid4().hex[:8].upper()}",
-        status=OrderStatus.RECEIVED,
+        status=OrderStatus.CONFIRMED,
         delivery_method=DeliveryMethod(body.delivery_method),
         recipient_name=body.recipient_name,
         phone=body.phone,
