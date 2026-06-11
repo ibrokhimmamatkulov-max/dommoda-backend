@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS sku VARCHAR(100)"))
         await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_original INTEGER"))
         await conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_percent INTEGER"))
-        # Orders — address + contact fields added after initial deploy
+        # Orders — add missing columns and make optional fields nullable
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS recipient_name VARCHAR(200)"))
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS email VARCHAR(200)"))
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS city VARCHAR(200)"))
@@ -63,6 +63,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS comment TEXT"))
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_discount INTEGER NOT NULL DEFAULT 0"))
         await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code VARCHAR(50)"))
+        # Drop NOT NULL from optional order fields (may have been created NOT NULL in earlier schema)
+        for col in ("recipient_name", "email", "city", "street", "building", "apartment", "zip_code", "comment", "promo_code"):
+            await conn.execute(text(f"ALTER TABLE orders ALTER COLUMN {col} DROP NOT NULL"))
     yield
     await engine.dispose()
 
@@ -101,7 +104,7 @@ async def _all_exceptions(request: Request, exc: Exception) -> JSONResponse:
     logging.getLogger(__name__).exception("Unhandled error: %s", exc)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "debug": str(exc)},
+        content={"detail": "Internal server error"},
         headers=cors_headers,
     )
 
