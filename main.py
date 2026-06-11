@@ -46,13 +46,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run ``alembic upgrade head`` first.
     """
     from sqlalchemy import text
-    # ALTER TYPE cannot run inside a regular transaction — use its own connection
-    async with engine.connect() as conn:
-        try:
+    from sqlalchemy.ext.asyncio import create_async_engine
+    # ALTER TYPE ADD VALUE requires AUTOCOMMIT — create a separate autocommit engine
+    _ddl_engine = create_async_engine(engine.url, isolation_level="AUTOCOMMIT")
+    try:
+        async with _ddl_engine.connect() as conn:
             await conn.execute(text("ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'received'"))
-            await conn.commit()
-        except Exception:
-            await conn.rollback()
+    except Exception:
+        pass
+    finally:
+        await _ddl_engine.dispose()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # Products — idempotent column additions
