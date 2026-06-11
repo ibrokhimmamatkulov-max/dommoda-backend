@@ -119,32 +119,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         # ------------------------------------------------------------------ #
         # STEP 1 — Fix CATEGORY (men / women / kids / sport) first.
-        # Subcategory backfill runs after so it works within the correct section.
+        # Source of truth: Russian gender keywords in the product name, and
+        # women-exclusive item types (dresses, skirts).  No brand-based guesses.
         # ------------------------------------------------------------------ #
 
-        # Men-only brands → always "men"
-        for brand in ("Henderson", "Zarina Man"):
-            await conn.execute(text(
-                "UPDATE products SET category = 'men' WHERE brand = :b"
-            ), {"b": brand})
+        # Explicit men keywords in name → "men"
+        await conn.execute(text(
+            "UPDATE products SET category = 'men' "
+            "WHERE (LOWER(name) LIKE '%мужск%' OR LOWER(name) LIKE '%мужчин%') "
+            "AND category NOT IN ('kids')"
+        ))
 
-        # Women-only brands → always "women"
-        for brand in ("Zarina", "Lime", "Befree", "Mango"):
-            await conn.execute(text(
-                "UPDATE products SET category = 'women' WHERE brand = :b"
-            ), {"b": brand})
+        # Explicit women keywords in name → "women"
+        await conn.execute(text(
+            "UPDATE products SET category = 'women' "
+            "WHERE (LOWER(name) LIKE '%женск%' OR LOWER(name) LIKE '%женщин%') "
+            "AND category NOT IN ('kids')"
+        ))
 
-        # Pure sport brands → "sport"
-        for brand in ("Demix", "Matrix Sport", "Matrix", "Alpex"):
-            await conn.execute(text(
-                "UPDATE products SET category = 'sport' WHERE brand = :b"
-            ), {"b": brand})
+        # Women-exclusive item types → "women" (dresses, skirts, blouses are never men's/kids')
+        await conn.execute(text(
+            "UPDATE products SET category = 'women' "
+            "WHERE subcategory IN ('dresses', 'skirts', 'blouses') "
+            "AND category NOT IN ('kids')"
+        ))
 
-        # Products with "спортивн" in name → "sport"
-        # (only if not already tagged as women — women's sportswear stays in women)
+        # "спортивн" in name → "sport" (applies to both men's and women's sportswear)
         await conn.execute(text(
             "UPDATE products SET category = 'sport' "
-            "WHERE LOWER(name) LIKE '%спортивн%' AND category != 'women'"
+            "WHERE LOWER(name) LIKE '%спортивн%' "
+            "AND category NOT IN ('kids')"
         ))
 
         # ------------------------------------------------------------------ #
