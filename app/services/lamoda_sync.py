@@ -246,7 +246,7 @@ async def run_full_sync() -> dict:
         return {"updated": 0, "skipped": 0, "errors": 0, "total": 0, "already_running": True}
 
     async with _sync_lock:
-        from app.database import AsyncSessionLocal
+        from app.database import async_session_factory as AsyncSessionLocal
         from app.models.product import Product
         from app.telegram import send_telegram
         from sqlalchemy import select
@@ -311,7 +311,7 @@ async def run_reclassify() -> dict:
         return {"updated": 0, "skipped": 0, "errors": 0, "total": 0, "already_running": True}
 
     async with _reclassify_lock:
-        from app.database import AsyncSessionLocal
+        from app.database import async_session_factory as AsyncSessionLocal
         from app.models.product import Product
         from app.telegram import send_telegram
         from sqlalchemy import select
