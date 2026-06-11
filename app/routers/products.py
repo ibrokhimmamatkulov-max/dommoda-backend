@@ -45,7 +45,7 @@ async def list_brands(db: DB) -> list[dict]:
         select(Product.brand, func.count(Product.id).label("count"))
         .where(Product.in_stock.is_(True))
         .group_by(Product.brand)
-        .order_by(Product.brand.asc())
+        .order_by(func.count(Product.id).desc())
     )
     return [{"name": row.brand, "count": row.count} for row in result.all()]
 
