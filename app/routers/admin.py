@@ -405,22 +405,8 @@ async def reclassify_categories(_admin: Admin) -> dict:
     """Start background re-classification of all product categories from Lamoda breadcrumbs.
     Returns immediately; result arrives via Telegram notification."""
     import asyncio
-    import logging
     from app.services.lamoda_sync import _reclassify_lock
-
     if _reclassify_lock.locked():
         return {"status": "already_running"}
-
-    async def _bg() -> None:
-        try:
-            await run_reclassify()
-        except Exception as exc:
-            logging.getLogger(__name__).exception("Reclassify background error: %s", exc)
-            try:
-                from app.telegram import send_telegram
-                await send_telegram(f"❌ *Reclassify упал*\n`{exc}`")
-            except Exception:
-                pass
-
-    asyncio.create_task(_bg())
+    asyncio.create_task(run_reclassify())
     return {"status": "started"}
