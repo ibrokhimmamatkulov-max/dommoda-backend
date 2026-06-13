@@ -289,6 +289,38 @@ async def admin_delete_product(
     await db.flush()
 
 
+@router.post(
+    "/products/clean-lamoda",
+    status_code=status.HTTP_200_OK,
+    summary="Strip Lamoda branding from product names and brands",
+)
+async def clean_lamoda_mentions(_admin: Admin, db: DB) -> dict:
+    from sqlalchemy import text
+    suffixes = [
+        " Lamoda Exclusive",
+        " Lamoda Online Exclusive",
+        " lamoda Exclusive",
+        " lamoda exclusive",
+        " LAMODA EXCLUSIVE",
+        " Lamoda",
+        " lamoda",
+    ]
+    updated = 0
+    for suffix in suffixes:
+        r = await db.execute(text(
+            "UPDATE products SET name = TRIM(REPLACE(name, :s, '')) "
+            "WHERE name ILIKE :pat"
+        ), {"s": suffix, "pat": f"%{suffix}%"})
+        updated += r.rowcount
+        r2 = await db.execute(text(
+            "UPDATE products SET brand = TRIM(REPLACE(brand, :s, '')) "
+            "WHERE brand ILIKE :pat"
+        ), {"s": suffix, "pat": f"%{suffix}%"})
+        updated += r2.rowcount
+    await db.flush()
+    return {"updated": updated}
+
+
 @router.delete(
     "/products",
     status_code=status.HTTP_200_OK,
