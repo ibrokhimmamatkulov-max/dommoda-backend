@@ -30,21 +30,19 @@ _EXCLUDE_KEYWORDS = [
     response_model_by_alias=True,
     summary="Get featured products for home page — newest, excluding underwear/socks",
 )
-async def get_featured_products(db: DB) -> list[ProductOut]:
+async def get_featured_products(
+    db: DB,
+    limit: int = Query(12, ge=1, le=48),
+    offset: int = Query(0, ge=0),
+) -> list[ProductOut]:
     from sqlalchemy import and_
-    exclusions = [
-        Product.name.ilike(f"%{kw}%") for kw in _EXCLUDE_KEYWORDS
-    ]
+    exclusions = [Product.name.ilike(f"%{kw}%") for kw in _EXCLUDE_KEYWORDS]
     result = await db.execute(
         select(Product)
-        .where(
-            and_(
-                Product.in_stock.is_(True),
-                *[~ex for ex in exclusions],
-            )
-        )
+        .where(and_(Product.in_stock.is_(True), *[~ex for ex in exclusions]))
         .order_by(Product.created_at.desc())
-        .limit(12)
+        .offset(offset)
+        .limit(limit)
     )
     products = result.scalars().all()
     return [ProductOut.from_orm_product(p) for p in products]
