@@ -18,18 +18,33 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 SortParam = Literal["popular", "price_asc", "price_desc", "new"]
 
 
+_EXCLUDE_KEYWORDS = [
+    "трус", "носк", "бюстгальтер", "бра ", "слип", "боксер", "плавк",
+    "колгот", "чулк", "термобелье", "нижнее белье", "подвязк",
+    "наклейки на грудь", "купальник",
+]
+
 @router.get(
     "/featured",
     response_model=list[ProductOut],
     response_model_by_alias=True,
-    summary="Get featured products for the home page (top 4 by review count)",
+    summary="Get featured products for home page — newest, excluding underwear/socks",
 )
 async def get_featured_products(db: DB) -> list[ProductOut]:
+    from sqlalchemy import and_
+    exclusions = [
+        Product.name.ilike(f"%{kw}%") for kw in _EXCLUDE_KEYWORDS
+    ]
     result = await db.execute(
         select(Product)
-        .where(Product.in_stock.is_(True))
-        .order_by(Product.review_count.desc())
-        .limit(4)
+        .where(
+            and_(
+                Product.in_stock.is_(True),
+                *[~ex for ex in exclusions],
+            )
+        )
+        .order_by(Product.created_at.desc())
+        .limit(12)
     )
     products = result.scalars().all()
     return [ProductOut.from_orm_product(p) for p in products]
