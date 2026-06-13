@@ -302,6 +302,52 @@ async def admin_delete_all_products(_admin: Admin, db: DB) -> dict:
     return {"deleted": result.rowcount}
 
 
+@router.delete(
+    "/products-bulk",
+    status_code=status.HTTP_200_OK,
+    summary="Bulk-delete products by filter — admin only",
+)
+async def admin_bulk_delete_products(
+    _admin: Admin,
+    db: DB,
+    brand: str | None = Query(None),
+    category: str | None = Query(None),
+    subcategory: str | None = Query(None),
+    keep_newest: int | None = Query(None, description="Keep only N newest matching products, delete the rest"),
+) -> dict:
+    """Hard-delete products matching brand/category/subcategory filters.
+
+    If keep_newest is set, keeps the N most recently added products and deletes the rest.
+    """
+    from sqlalchemy import delete as sa_delete, asc
+
+    conditions = []
+    if brand:
+        conditions.append(Product.brand == brand)
+    if category:
+        conditions.append(Product.category == category)
+    if subcategory:
+        conditions.append(Product.subcategory == subcategory)
+
+    if not conditions:
+        return {"deleted": 0, "error": "At least one filter required"}
+
+    if keep_newest is not None:
+        # Find IDs to keep (newest N), then delete the rest
+        q = select(Product.id).where(*conditions).order_by(Product.created_at.desc()).limit(keep_newest)
+        result = await db.execute(q)
+        keep_ids = [r[0] for r in result.fetchall()]
+        stmt = sa_delete(Product).where(*conditions)
+        if keep_ids:
+            stmt = stmt.where(Product.id.notin_(keep_ids))
+    else:
+        stmt = sa_delete(Product).where(*conditions)
+
+    result = await db.execute(stmt)
+    await db.flush()
+    return {"deleted": result.rowcount}
+
+
 # ---------------------------------------------------------------------------
 # Orders
 # ---------------------------------------------------------------------------
